@@ -7,7 +7,7 @@ A shell based proxy for `apt-cacher-ng`.
 > It lacks many features, like reaching out to another Proxy etc.
 > And there is no documentation.  Read the source.  I did it as simple as I can.
 >
-> However it should be easy to implement yourself, just look into the script `./GET.sh`
+> However it should be easy to add missing features yourself, just look into the script `./GET.sh`
 
 It upgrades `http` requests to `https` for certain destinations:
 
