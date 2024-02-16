@@ -10,6 +10,7 @@
 #	NoSSLChecks: 0
 
 TIMEOUT=10
+DOWNGRADE=/tmp/APT-CACHER-NG-PROXY.https.tmp
 
 STDOUT() { local a b; printf -va '[%s] %q' "$SOCKLINGER_NR" "$1"; [ 1 -ge $# ] || printf -vb ' %q' "${@:2}"; printf '%s%s\n' "$a" "$b"; }
 STDERR() { STDOUT "$@" >&2; }
@@ -62,12 +63,14 @@ get-headers()
 
 GET()
 {
+  local STDPORT SOCATMODE
+
   printf -vh '%s\r\n' "${HEADS[@]}"
   case "$MODE" in
-  (http)	SOCATMODE=tcp;;
-  (https)	SOCATMODE=openssl;;
+  (http)	STDPORT=80;  SOCATMODE=tcp;;
+  (https)	STDPORT=443; SOCATMODE=openssl;;
   esac
-  MODE="$MODE" Host="$Host" PORT="$PORT" URL="$URL" HEADS="$h" PARENT="$SOCKLINGER_NR" TIMEOUT="$TIMEOUT" o socat "$SOCATMODE:$Host:$PORT" "exec:${0%/*}/GET.sh" 3>&1 >&2
+  MODE="$MODE" Host="$Host" PORT="${PORT:-$STDPORT}" URL="$URL" HEADS="$h" PARENT="$SOCKLINGER_NR" TIMEOUT="$TIMEOUT" o socat "$SOCATMODE:$Host:${PORT:-$STDPORT}" "exec:${0%/*}/GET.sh" 3>&1 >&2
 }
 
 getter()
@@ -88,13 +91,11 @@ getter()
   (apache.jfrog.io)			MODE=https;;
   (developer.download.nvidia.com)	MODE=https;;
 
-  (*)				STDERR Host "$Host";;
+# Hack: Upgrade downgraded Location requests, see GET.sh
+  (*)					fgrep -qsx "$Host" "$DOWNGRADE" && MODE=https || STDERR Host "$Host";;
   esac
 
-  case "$MODE" in
-  (http)	PORT=80;;
-  (https)	PORT=443;;
-  esac
+  PORT=
   # Following heuristic probably fails for IPv6 IP based hosts:
   case "$Host" in
   (*:*)		PORT="${Host##*:}"; Host="${Host%:*}";;

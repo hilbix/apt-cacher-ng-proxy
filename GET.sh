@@ -6,21 +6,23 @@
 #
 # It needs some environment variables:
 #
-# MODE		http or https
-# Host		hostname to connect to
-# PORT		PORT number to connect to
-# URL		The URL PATH without the host part
-# HEADS		all the headers, already correctly preformatted with \r\n in between
-#		like with: printf -vHEADS '%s\r\n' "${HEADERS[@]}"
-#		(because bash cannot pass arrays into subshells)
-# TIMEOUT	Timeout in seconds
-# PARENT	$SOCKLINGER_NR of the parent (or something similar)
+# MODE		informational	http or https
+# Host		informational	hostname to connect to
+# PORT		informational	PORT number to connect to
+# URL		mandatory	The URL PATH without the host part
+# HEADS		mandatory	all the headers, already correctly preformatted with \r\n in between
+#				like with: printf -vHEADS '%s\r\n' "${HEADERS[@]}"
+#				(because bash cannot pass arrays into subshells)
+# TIMEOUT	default=60	Timeout in seconds
+# PARENT	informational	$SOCKLINGER_NR of the parent (or something similar)
 #
 # This needs some of my own tools:
 #
 # https://github.com/hilbix/unbuffered
 # https://github.com/hilbix/timeout
 
+LONG_TIMEOUT=60
+DOWNGRADE="/tmp/APT-CACHER-NG-PROXY.https.tmp"
 
 STDOUT() { local a b; printf -va '[%s] %q' "${PARENT:-${SOCKLINGER_NR:-$PPID}}" "$1"; [ 1 -ge $# ] || printf -vb ' %q' "${@:2}"; printf '%s%s\n' "$a" "$b"; }
 STDERR() { STDOUT "$@" >&2; }
@@ -28,10 +30,32 @@ OOPS() { STDERR OOPS: "$@"; exit 23; }
 x() { "$@"; }
 o() { x "$@" || OOPS fail $?: "$@"; }
 
+# Downgrade https location header
+# Remember the downgrade to upgrade to HTTPS later again
+location()
+{
+  local dest
+
+  STDERR location "$hd"
+  case "$hd" in
+  (https://*)	;;
+  (*)		return;;
+  esac
+  hd="${hd#https://}"
+  dest="${hd%%/*}"
+  hd="http://$hd"
+  h="$ht: $hd"
+
+  STDERR DOWNGRADE "$dest"
+  # Add the downgrade to the upgrade list
+  x fgrep -svf "$DOWNGRADE" >> "$DOWNGRADE" <<< "$dest"
+}
+
 get-headers()
 {
   HEADS=()
   CURLHEADS=()
+  LAYER=normal
   while	read -rt${TIMEOUT:-10} h && h="${h%$'\r'}" && [ -n "$h" ]
   do
         ht="${h%%: *}"
@@ -44,6 +68,9 @@ get-headers()
         (cache-control:*)	continue;;
         (content-length:*)	ContentLength="$hd";;
         (content-type:*)	ContentType="$hd";;
+        (transfer-encoding:*chunked*)	LAYER=chunked;;		# JFROG uses this, sigh
+        (transfer-encoding:*)	;;
+        (location:*)		location;;
 
 # request
 #        (accept:*)		Accept="$hd";;
@@ -56,29 +83,35 @@ get-headers()
 #        (accept-language:*)	;;
 
 # response
-	(upgrade:*)		continue;;
-	(accept-ranges:*)	;;
-	(date:*)		;;
-	(expires:*)		;;
-	(etag:*)		;;
-	(content-range:*)	ContentRange="$hd";;
-	(last-modified:*)	;;
-	(server:*)		;;
-	(age:*)			;;
-	(via:*)			;;
-	(vary:*)		;;
-	(permissions-policy:*)	;;
-	(referrer-policy:*)	;;
-	(x-frame-options:*)	;;
-	(x-xss-protection:*)	;;
+        (upgrade:*)		continue;;
+        (accept-ranges:*)	;;
+        (date:*)		;;
+        (expires:*)		;;
+        (etag:*)		;;
+        (content-range:*)	ContentRange="$hd";;
+        (last-modified:*)	;;
+        (server:*)		;;
+        (age:*)			;;
+        (via:*)			;;
+        (vary:*)		;;
+        (permissions-policy:*)	;;
+        (referrer-policy:*)	;;
+        (x-frame-options:*)	;;
+        (x-xss-protection:*)	;;
 
 # WTF?
-	(x-content-type-options:*)	;;
-	(x-clacks-overhead:*)	;;	# Terry Pratchett?
-	(x-served-by:*)		;;
-	(x-cache:*)		;;
-	(x-cache-hits:*)	;;
-	(x-timer:*)		;;
+        (x-content-type-options:*)	;;
+        (x-clacks-overhead:*)	;;	# GNU Terry Pratchett
+        (x-served-by:*)		;;
+        (x-cache:*)		;;
+        (x-cache-hits:*)	;;
+        (x-timer:*)		;;
+
+# JFROG
+        (x-jfrog-version)	;;
+        (x-artifactory-id)	;;
+        (x-artifactory-node-id)	;;
+        (x-request-id)		;;
 
         (*)			STDERR head "$ht:" "$hd";;
         esac
@@ -87,6 +120,30 @@ get-headers()
   done
 }
 
+LAYER-normal()
+{
+  [ -n "$ContentLength" ] || OOPS missing ContentLength
+  cnt="$(set -o pipefail; head -c "$ContentLength" | /usr/local/bin/timeout "$LONG_TIMEOUT" - | /usr/local/bin/unbuffered -o3 | wc -c)" || OOPS transfer failed
+}
+
+LAYER-chunked()
+{
+  [ -z "$ContentLength" ] || OOPS chunked with ContentLength
+  while	read -rt "$LONG_TIMEOUT" -n30 n || OOPS unexpected EOF at $cnt
+        n="${n%$'\r'}"
+
+#	STDERR chunk "$cnt" "$n"
+        printf '%s\r\n' "$n"
+        [ 0 = "$cnt" ] || { let cnt+=n && head -c "$n" | /usr/local/bin/timeout "$LONG_TIMEOUT" -; } || OOPS transfer failed at $cnt
+
+        read -rt "$LONG_TIMEOUT" -n2 t || OOPS unexpected EOF at $cnt
+        [ -z "${t%$'\r'}" ] || OOPS unexpected chunk at $cnt: "$t"
+        printf '\r\n'
+
+        [ 0 != "$n" ]
+  do :
+  done >&3
+}
 
 printf 'GET %s HTTP/1.1\r\n' "$URL"
 printf 'connection: close\r\n'
@@ -109,11 +166,12 @@ printf '%s\r\n' "${HEADS[@]}" '' >&3 || OOPS EOF
 
 # Use `head` to restrict the number of incoming bytes.
 # Because apparently some hosts seem to ignore "connection: close".
-cnt="$(set -o pipefail; head -c "$ContentLength" | /usr/local/bin/timeout 60 - | /usr/local/bin/unbuffered -o3 | wc -c)" || OOPS timeout $TIMEOUT
+cnt=0
+"LAYER-$LAYER"
 
 # We probably should store the body above before passing it back
 # such that we can test it for correctness before handing it to apt-cacher-ng
 
 STDERR DONE "$cnt"
-[ "$cnt" = "$ContentLength" ] || OOPS content got "$cnt" length "$ContentLength" range "$ContentRange"
+[ -z "$ContentLength" ] || [ "$cnt" = "$ContentLength" ] || OOPS content got "$cnt" length "$ContentLength" range "$ContentRange"
 
