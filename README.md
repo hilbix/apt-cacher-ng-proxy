@@ -47,7 +47,7 @@ Or without the `autostart.sh` script of `ptybuffer`:
 
 > In case you do not want to use `socklinger`:
 >
->	socat tcp-listen:8080,bind=127.0.0.1,reuseaddr,fork exec:./proxy.sh
+>     socat tcp-listen:8080,bind=127.0.0.1,reuseaddr,fork exec:./proxy.sh
 >
 > is similar, however `socklinger` limits the number of parallel connects to 5 (see `-n`).
 > You can use `inetd` or `xinetd` of course, too, to run `./proxy.sh`
