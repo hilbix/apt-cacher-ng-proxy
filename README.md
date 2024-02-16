@@ -40,12 +40,19 @@ Then:
 	git clone https://github.com/hilbix/apt-cacher-ng-proxy.git
 	ln -s --relative apt-cacher-ng-proxy/autostart ~/autostart/proxy
 
-Or without `ptybuffer`:
+Or without the `autostart.sh` script of `ptybuffer`:
 
 	cd apt-cacher-ng-proxy
 	socklinger -n-5 127.0.0.2:8080 ./proxy.sh
 
-To configure `apt-cacher-ng` to use the proxy port:
+> In case you do not want to use `socklinger`:
+>
+>	socat tcp-listen:8080,bind=127.0.0.1,reuseaddr,fork exec:./proxy.sh
+>
+> is similar, however `socklinger` limits the number of parallel connects to 5 (see `-n`).
+> You can use `inetd` or `xinetd` of course, too, to run `./proxy.sh`
+
+To configure `apt-cacher-ng` to use the proxy on `127.0.0.2:8080`:
 
 Create file `/etc/apt-cacher-ng/proxy.conf` with following contents:
 
@@ -71,6 +78,10 @@ WTF why?
 - Because `apt-cacher-ng` suddenly refused to download `https` URLs from apache.jfrog.io
 - Because I was unable to configure `apt-cacher-ng` to properly use `tinyproxy`
 - Because `apt-cacher-ng` is not able to use HTTP/1.0 proxies which close the connection on each request
+
+CONNECT?
+
+- Not supported by purpose .. yet
 
 License?
 
