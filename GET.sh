@@ -98,6 +98,7 @@ get-headers()
         (referrer-policy:*)	;;
         (x-frame-options:*)	;;
         (x-xss-protection:*)	;;
+	(content-disposition:*)	;;
 
 # WTF?
         (x-content-type-options:*)	;;
@@ -108,10 +109,14 @@ get-headers()
         (x-timer:*)		;;
 
 # JFROG
-        (x-jfrog-version)	;;
-        (x-artifactory-id)	;;
-        (x-artifactory-node-id)	;;
-        (x-request-id)		;;
+        (x-jfrog-version:*)	;;
+        (x-artifactory-id:*)	;;
+        (x-artifactory-node-id:*)	;;
+        (x-request-id:*)	;;
+	(x-checksum-sha1:*)	;;
+	(x-checksum-sha256:*)	;;
+	(x-checksum-md5:*)	;;
+	(x-artifactory-filename:*)	;;
 
         (*)			STDERR head "$ht:" "$hd";;
         esac
