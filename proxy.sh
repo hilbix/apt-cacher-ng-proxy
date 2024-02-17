@@ -11,9 +11,10 @@
 
 TIMEOUT=10
 DOWNGRADE=/tmp/APT-CACHER-NG-PROXY.https.tmp
+UNKNOWN=/tmp/APT-CACHER-NG-PROXY.host.unknown.tmp
 
 STDOUT() { local a b; printf -va '[%s] %q' "$SOCKLINGER_NR" "$1"; [ 1 -ge $# ] || printf -vb ' %q' "${@:2}"; printf '%s%s\n' "$a" "$b"; }
-STDERR() { STDOUT "$@" >&2; }
+STDERR() { local e=$?; STDOUT "$@" >&2; return $e; }
 FAIL()
 {
   printf -v fail ' %q' "$@"
@@ -83,6 +84,7 @@ getter()
   MODE=http
   case "$Host" in
 # list of known hostnames to not log
+  (deb.debian.org)		;;
   (cdn-fastly.deb.debian.org)	;;
   (ftp.tu-ilmenau.de)		;;
   (ftp.hosteurope.de)		;;
@@ -92,7 +94,7 @@ getter()
   (developer.download.nvidia.com)	MODE=https;;
 
 # Hack: Upgrade downgraded Location requests, see GET.sh
-  (*)					fgrep -qsx "$Host" "$DOWNGRADE" && MODE=https || STDERR Host "$Host";;
+  (*)					fgrep -qsx "$Host" "$DOWNGRADE" && MODE=https || STDERR Host "$Host" || fgrep -svf "$UNKNOWN" >> "$UNKNOWN" <<< "$Host";;
   esac
 
   PORT=
