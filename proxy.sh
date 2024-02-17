@@ -94,7 +94,7 @@ getter()
   (developer.download.nvidia.com)	MODE=https;;
 
 # Hack: Upgrade downgraded Location requests, see GET.sh
-  (*)					fgrep -qsx "$Host" "$DOWNGRADE" && MODE=https || STDERR Host "$Host" || fgrep -svf "$UNKNOWN" >> "$UNKNOWN" <<< "$Host";;
+  (*)					fgrep -qsx "$Host" "$DOWNGRADE" && MODE=https || STDERR Host "$Host" see "$UNKNOWN" || fgrep -svf "$UNKNOWN" >> "$UNKNOWN" <<< "$Host";;
   esac
 
   PORT=
