@@ -84,17 +84,33 @@ getter()
   MODE=http
   case "$Host" in
 # list of known hostnames to not log
+# Debian
   (deb.debian.org)		;;
   (cdn-fastly.deb.debian.org)	;;
+
+# Ubuntu
+  (ppa.launchpadcontent.net)	;;
+  (ppa.launchpad.net)		;;
+  (security.ubuntu.com)		;;
   (ftp.tu-ilmenau.de)		;;
   (ftp.hosteurope.de)		;;
+  (ddebs.ubuntu.com)		;;
+
+# Raspbian
+  (archive.raspberrypi.org)	;;
+
+# Microsoft et al
+  (packages.microsoft.com)	;;
+  (dl.google.com)		;;
 
 # list of hostnames to treat special
   (apache.jfrog.io)			MODE=https;;
   (developer.download.nvidia.com)	MODE=https;;
 
-# Hack: Upgrade downgraded Location requests, see GET.sh
-  (*)					fgrep -qsx "$Host" "$DOWNGRADE" && MODE=https || STDERR Host "$Host" see "$UNKNOWN" || fgrep -svf "$UNKNOWN" >> "$UNKNOWN" <<< "$Host";;
+  (*)	fgrep -qsx "$Host" "$DOWNGRADE" && MODE=https ||	# Hack: Upgrade downgraded Location requests, see GET.sh
+        STDERR Host "$Host" see "$UNKNOWN" ||			# Report unknown hosts
+        fgrep -svf "$UNKNOWN" >> "$UNKNOWN" <<< "$Host"		# Record unknwon hosts
+        ;;
   esac
 
   PORT=
