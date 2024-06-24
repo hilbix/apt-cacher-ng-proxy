@@ -4,15 +4,20 @@
 
 A shell based proxy for `apt-cacher-ng`.
 
-> It lacks many features, like reaching out to another Proxy etc.
-> And there is no documentation.  Read the source.  I did it as simple as I can.
+So the path is `apt =Acquire::http::Proxy=> apt-cacher-ng =/etc/apt-cacher-ng/proxy.conf=> apt-cacher-ng-proxy =socat=> Internet`
+
+> It probably lacks features, like reaching out to another Proxy etc.
 >
-> However it should be easy to add missing features yourself, just look into the script `./GET.sh`
+> There is not much documentation yet on how to extend it.
+> Read the source.  I did it as simple as I can.
+>
+> It should be easy to add missing features yourself, just look into the script [`./GET.sh`](GET.sh)
 
 It upgrades `http` requests to `https` for certain destinations:
 
 - apache.jfrog.io
 - developer.download.nvidia.com
+- (The list can be extended in `GET.sh`)
 
 So no need to rewrite `https://` to `http:///HTTPS/`,
 instead just replace `https:` with `http:` (hence remove the `s`).
@@ -69,6 +74,8 @@ because if `apt-cacher-ng` ever sees a single byte corruption, you will have a v
 > All other ways trying to handle it with the `apt-cacher-ng` web frontend failed for me for unknown reason.
 >
 > YMMV if you grok it better than me.
+
+There should be a standard way to talk to a `http(s)` type proxy in `proxy.sh` (look for `socat`).
 
 
 ## FAQ
