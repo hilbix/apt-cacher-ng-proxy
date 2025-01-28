@@ -58,19 +58,20 @@ get-headers()
   LAYER=normal
   while	read -rt${TIMEOUT:-10} h && h="${h%$'\r'}" && [ -n "$h" ]
   do
-        ht="${h%%: *}"
-        hd="${h#*: }"
-        o test ".$h" = ".$ht: $hd"
-        ht="${ht,,}"
-        case "$ht:$hd" in
-        (proxy-connection:*)	continue;;
-        (connection:*)		continue;;
-        (cache-control:*)	continue;;
-        (content-length:*)	ContentLength="$hd";;
-        (content-type:*)	ContentType="$hd";;
-        (transfer-encoding:*chunked*)	LAYER=chunked;;		# JFROG uses this, sigh
-        (transfer-encoding:*)	;;
-        (location:*)		location;;
+	ht="${h%%: *}"
+	hd="${h#*: }"
+	o test ".$h" = ".$ht: $hd"
+	STDERR HEAD: "$ht:" "$hd"
+	ht="${ht,,}"
+	case "$ht:$hd" in
+	(proxy-connection:*)	continue;;
+	(connection:*)		continue;;
+	(cache-control:*)	continue;;
+	(content-length:*)	ContentLength="$hd";;
+	(content-type:*)	ContentType="$hd";;
+	(transfer-encoding:*chunked*)	LAYER=chunked;;		# JFROG uses this, sigh
+	(transfer-encoding:*)	;;
+	(location:*)		location;;
 
 # request
 #        (accept:*)		Accept="$hd";;
@@ -83,45 +84,45 @@ get-headers()
 #        (accept-language:*)	;;
 
 # response
-        (upgrade:*)		continue;;
-        (accept-ranges:*)	;;
-        (date:*)		;;
-        (expires:*)		;;
-        (etag:*)		;;
-        (content-range:*)	ContentRange="$hd";;
-        (last-modified:*)	;;
-        (server:*)		;;
-        (age:*)			;;
-        (via:*)			;;
-        (vary:*)		;;
-        (permissions-policy:*)	;;
-        (referrer-policy:*)	;;
-        (x-frame-options:*)	;;
-        (x-xss-protection:*)	;;
+	(upgrade:*)		continue;;
+	(accept-ranges:*)	;;
+	(date:*)		;;
+	(expires:*)		;;
+	(etag:*)		;;
+	(content-range:*)	ContentRange="$hd";;
+	(last-modified:*)	;;
+	(server:*)		;;
+	(age:*)			;;
+	(via:*)			;;
+	(vary:*)		;;
+	(permissions-policy:*)	;;
+	(referrer-policy:*)	;;
+	(x-frame-options:*)	;;
+	(x-xss-protection:*)	;;
 	(content-disposition:*)	;;
 
 # WTF?
-        (x-content-type-options:*)	;;
-        (x-clacks-overhead:*)	;;	# GNU Terry Pratchett
-        (x-served-by:*)		;;
-        (x-cache:*)		;;
-        (x-cache-hits:*)	;;
-        (x-timer:*)		;;
+	(x-content-type-options:*)	;;
+	(x-clacks-overhead:*)	;;	# GNU Terry Pratchett
+	(x-served-by:*)		;;
+	(x-cache:*)		;;
+	(x-cache-hits:*)	;;
+	(x-timer:*)		;;
 
 # JFROG
-        (x-jfrog-version:*)	;;
-        (x-artifactory-id:*)	;;
-        (x-artifactory-node-id:*)	;;
-        (x-request-id:*)	;;
+	(x-jfrog-version:*)	;;
+	(x-artifactory-id:*)	;;
+	(x-artifactory-node-id:*)	;;
+	(x-request-id:*)	;;
 	(x-checksum-sha1:*)	;;
 	(x-checksum-sha256:*)	;;
 	(x-checksum-md5:*)	;;
 	(x-artifactory-filename:*)	;;
 
-        (*)			STDERR head "$ht:" "$hd";;
-        esac
-        CURLHEADS+=(-H "$h")
-        HEADS+=("$h")
+	(*)			STDERR head "$ht:" "$hd";;
+	esac
+	CURLHEADS+=(-H "$h")
+	HEADS+=("$h")
   done
 }
 
@@ -135,18 +136,17 @@ LAYER-chunked()
 {
   [ -z "$ContentLength" ] || OOPS chunked with ContentLength
   while	read -rt "$LONG_TIMEOUT" -n30 n || OOPS unexpected EOF at $cnt
-        n="${n%$'\r'}"
+	n="${n%$'\r'}"
 
 #	STDERR chunk "$cnt" "$n"
-        printf '%s\r\n' "$n"
-        [ 0 = "$cnt" ] || { let cnt+=n && head -c "$n" | /usr/local/bin/timeout "$LONG_TIMEOUT" -; } || OOPS transfer failed at $cnt
+	printf '%s\r\n' "$n"
+	[ 0 != "$n" ]
+  do
+	{ let cnt+=$[16#$n] && head -c "$[16#$n]" | /usr/local/bin/timeout "$LONG_TIMEOUT" -; } || OOPS transfer failed at $cnt
 
-        read -rt "$LONG_TIMEOUT" -n2 t || OOPS unexpected EOF at $cnt
-        [ -z "${t%$'\r'}" ] || OOPS unexpected chunk at $cnt: "$t"
-        printf '\r\n'
-
-        [ 0 != "$n" ]
-  do :
+	read -rt "$LONG_TIMEOUT" -n2 t || OOPS unexpected EOF at $cnt
+	[ -z "${t%$'\r'}" ] || OOPS unexpected 0x$n chunk at $cnt: "$t"
+	printf '\r\n' || OOPS cannot write at $cnt
   done >&3
 }
 
