@@ -61,7 +61,7 @@ get-headers()
 	ht="${h%%: *}"
 	hd="${h#*: }"
 	o test ".$h" = ".$ht: $hd"
-	STDERR HEAD: "$ht:" "$hd"
+#	STDERR HEAD: "$ht:" "$hd"
 	ht="${ht,,}"
 	case "$ht:$hd" in
 	(proxy-connection:*)	continue;;
@@ -135,18 +135,21 @@ LAYER-normal()
 LAYER-chunked()
 {
   [ -z "$ContentLength" ] || OOPS chunked with ContentLength
-  while	read -rt "$LONG_TIMEOUT" -n30 n || OOPS unexpected EOF at $cnt
+  while	read -rt "$LONG_TIMEOUT" -n30 n ign || OOPS unexpected EOF at $cnt
 	n="${n%$'\r'}"
+	c="$[16#$n]"
 
-#	STDERR chunk "$cnt" "$n"
+#	STDERR chunk "$cnt" "$c"
 	printf '%s\r\n' "$n"
-	[ 0 != "$n" ]
-  do
-	{ let cnt+=$[16#$n] && head -c "$[16#$n]" | /usr/local/bin/timeout "$LONG_TIMEOUT" -; } || OOPS transfer failed at $cnt
+
+	[ 0 = $c ] || { let cnt+=c && head -c "$c" | /usr/local/bin/timeout "$LONG_TIMEOUT" -; } || OOPS transfer of $c failed at $cnt
 
 	read -rt "$LONG_TIMEOUT" -n2 t || OOPS unexpected EOF at $cnt
 	[ -z "${t%$'\r'}" ] || OOPS unexpected 0x$n chunk at $cnt: "$t"
 	printf '\r\n' || OOPS cannot write at $cnt
+
+	[ 0 != "$n" ]
+  do	:
   done >&3
 }
 
